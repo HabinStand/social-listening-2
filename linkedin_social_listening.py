@@ -33,26 +33,13 @@ topic = st.sidebar.text_input(
 st.sidebar.markdown("""
 **💡 How to collect LinkedIn data:**
 
-Since this app can't access LinkedIn directly, you'll need to collect data manually:
-
-**Method 1: Copy-Paste (Recommended)**
-1. Use the **Copy-Paste Extractor** HTML tool
-2. Search LinkedIn for your topic
-3. Copy entire page (Ctrl+A, Ctrl+C)
-4. Paste into tool → Download CSV
-5. Upload CSV here
-
-**Method 2: Manual Entry**
-1. Use the **Manual Entry** HTML tool
-2. Copy post details from LinkedIn
-3. Add each post → Download CSV
-4. Upload CSV here
-
-**Get the tools:** Download `linkedin_copy_paste_extractor.html` and `linkedin_data_entry.html` from the project repository.
+1. **Ask your project manager** for the LinkedIn extractor tool file
+2. **Use the tool** to collect data from LinkedIn  
+3. **Upload the CSV** using the button below ⬇️
 
 ---
 
-**For now, try the Demo Data below!** ⬇️
+**Or try the Demo Data** to see how it works!
 """)
 
 # Sample data generator for demonstration
@@ -584,168 +571,209 @@ def main():
             mime="application/json"
         )
     
+    # All Posts Table with Filters
+    st.header("📋 All LinkedIn Posts")
+    
+    # Filters
+    st.subheader("🔍 Filters")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # Date filter
+        st.write("**Date Range**")
+        
+        # Convert date column to datetime if it's not already
+        if not pd.api.types.is_datetime64_any_dtype(df['date']):
+            df['date'] = pd.to_datetime(df['date'])
+        
+        min_date = df['date'].min().date()
+        max_date = df['date'].max().date()
+        
+        date_range = st.date_input(
+            "Select date range",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+            key="date_filter"
+        )
+        
+        # Handle single date or range
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_date, end_date = date_range
+        else:
+            start_date = end_date = date_range if isinstance(date_range, tuple) else date_range
+    
+    with col2:
+        # Sentiment filter
+        st.write("**Sentiment**")
+        sentiment_options = ['All'] + sorted(df['sentiment'].unique().tolist())
+        selected_sentiment = st.selectbox(
+            "Filter by sentiment",
+            sentiment_options,
+            key="sentiment_filter"
+        )
+    
+    with col3:
+        # Sort options
+        st.write("**Sort By**")
+        sort_options = {
+            'Date (Newest)': ('date', False),
+            'Date (Oldest)': ('date', True),
+            'Engagement (High to Low)': ('engagement_score', False),
+            'Engagement (Low to High)': ('engagement_score', True),
+            'Likes (High to Low)': ('likes', False),
+            'Author (A-Z)': ('author', True)
+        }
+        selected_sort = st.selectbox(
+            "Sort posts by",
+            list(sort_options.keys()),
+            key="sort_filter"
+        )
+    
+    # Apply filters
+    filtered_df = df.copy()
+    
+    # Date filter
+    filtered_df = filtered_df[
+        (filtered_df['date'].dt.date >= start_date) & 
+        (filtered_df['date'].dt.date <= end_date)
+    ]
+    
+    # Sentiment filter
+    if selected_sentiment != 'All':
+        filtered_df = filtered_df[filtered_df['sentiment'] == selected_sentiment]
+    
+    # Apply sorting
+    sort_column, ascending = sort_options[selected_sort]
+    filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending)
+    
+    # Display filter results
+    st.write(f"**Showing {len(filtered_df)} of {len(df)} posts**")
+    
+    # Display posts in expandable format
+    st.subheader("📊 Posts Data")
+    
+    for idx, row in filtered_df.iterrows():
+        # Create a colored badge for sentiment
+        sentiment_colors = {
+            'Positive': '🟢',
+            'Neutral': '🟡',
+            'Negative': '🔴'
+        }
+        sentiment_badge = sentiment_colors.get(row['sentiment'], '⚪')
+        
+        # Format date
+        try:
+            date_str = row['date'].strftime('%Y-%m-%d')
+        except:
+            date_str = str(row['date'])
+        
+        with st.expander(
+            f"{sentiment_badge} {row['author']} • {date_str} • 💬 {row['engagement_score']:.0f} engagement",
+            expanded=False
+        ):
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.markdown(f"**Author:** {row['author']}")
+                if row.get('title'):
+                    st.markdown(f"**Title:** {row['title']}")
+                st.markdown(f"**Posted:** {date_str}")
+                st.markdown(f"**Sentiment:** {sentiment_badge} {row['sentiment']} (Score: {row['sentiment_score']:.2f})")
+            
+            with col2:
+                st.metric("👍 Likes", f"{row['likes']:,}")
+                st.metric("💬 Comments", f"{row['comments']:,}")
+                st.metric("🔄 Shares", f"{row['shares']:,}")
+                st.metric("📊 Engagement", f"{row['engagement_score']:,.0f}")
+            
+            st.markdown("**Post Content:**")
+            st.write(row['text'])
+            
+            if row.get('url'):
+                st.markdown(f"🔗 [View on LinkedIn]({row['url']})")
+    
+    # Also show as data table
+    st.subheader("📄 Table View")
+    
+    # Select columns to display
+    display_columns = ['date', 'author', 'title', 'text', 'likes', 'comments', 'shares', 
+                      'engagement_score', 'sentiment', 'cluster_name']
+    
+    # Filter to only existing columns
+    display_columns = [col for col in display_columns if col in filtered_df.columns]
+    
+    # Create display dataframe
+    display_df = filtered_df[display_columns].copy()
+    
+    # Format date column
+    if 'date' in display_df.columns:
+        display_df['date'] = pd.to_datetime(display_df['date']).dt.strftime('%Y-%m-%d')
+    
+    # Truncate long text
+    if 'text' in display_df.columns:
+        display_df['text'] = display_df['text'].apply(lambda x: str(x)[:100] + '...' if len(str(x)) > 100 else str(x))
+    
+    # Rename columns for display
+    column_names = {
+        'date': 'Date',
+        'author': 'Author',
+        'title': 'Title',
+        'text': 'Post Text',
+        'likes': 'Likes',
+        'comments': 'Comments',
+        'shares': 'Shares',
+        'engagement_score': 'Engagement',
+        'sentiment': 'Sentiment',
+        'cluster_name': 'Topic'
+    }
+    display_df = display_df.rename(columns=column_names)
+    
+    # Show table
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    # Download filtered data
+    st.markdown("---")
+    filtered_csv = filtered_df.to_csv(index=False)
+    st.download_button(
+        label="📥 Download Filtered Data (CSV)",
+        data=filtered_csv,
+        file_name=f"filtered_posts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
+    
     # Footer
     st.markdown("---")
     
-    # Prominent download section
-    st.info("👇 **Need the data collection tools?** Download the HTML files from the '2_LOCAL_TOOLS' folder in the project repository.")
-    
-    with st.expander("📥 Where to Get the Data Collection Tools", expanded=False):
-        st.markdown("""
-        The data collection tools are **HTML files** that you need to download and save on your computer.
-        
-        **Files you need:**
-        - `linkedin_copy_paste_extractor.html` ⭐ (Recommended)
-        - `linkedin_data_entry.html` (Alternative method)
-        
-        **Where to find them:**
-        1. Go to the project's GitHub repository or download package
-        2. Look in the `2_LOCAL_TOOLS` folder
-        3. Download both HTML files to your computer
-        4. Save them somewhere easy to find (like your Desktop)
-        
-        **How to use:**
-        - Double-click the HTML file to open it in your browser
-        - No installation needed - they work offline!
-        - Follow the instructions in each tool
-        
-        **Don't have the files?** Ask whoever deployed this app to share the `2_LOCAL_TOOLS` folder with you.
-        """)
+    # Simplified instructions
+    st.info("📥 **Need the LinkedIn extractor tool?** Ask your project manager for the tool file, then upload your CSV via the button above.")
     
     st.markdown("""
-    ### 📝 How to Collect LinkedIn Data
+    ### 📝 How to Use This App
     
-    Since this app doesn't have direct LinkedIn API access, here's how to get your data:
+    **Step 1: Get the Tool**  
+    Ask your project manager for the LinkedIn extractor tool file.
     
-    #### Method 1: Copy-Paste Extractor (Recommended - Easiest!)
+    **Step 2: Collect Data**  
+    Use the tool to extract LinkedIn posts about your topic.
     
-    **Step-by-step:**
+    **Step 3: Upload & Analyze**  
+    Upload the CSV file using the button in the sidebar, then explore your insights!
     
-    1. **Download the Copy-Paste Extractor tool** (`linkedin_copy_paste_extractor.html`)
-    2. **Open it in your browser** (just double-click the file)
-    3. **Go to LinkedIn** and search for your topic (e.g., "AI trends", "Climate tech", "Web3")
-    4. **Make sure you're on the "Posts" tab** in the search results
-    5. **Scroll down** to load 20-50 posts (the more you scroll, the more data you'll get)
-    6. **Select all** the content on the page:
-       - Windows: Press `Ctrl+A`
-       - Mac: Press `Cmd+A`
-    7. **Copy** everything:
-       - Windows: Press `Ctrl+C`
-       - Mac: Press `Cmd+C`
-    8. **Go back to the Copy-Paste Extractor tool**
-    9. **Paste** into the text box:
+    ---
        - Windows: Press `Ctrl+V`
-       - Mac: Press `Cmd+V`
-    10. **Click "Extract & Download CSV"**
-    11. **Come back here and upload the CSV file!**
-    
-    **This takes 2 minutes and works 100% of the time!**
-    
-    ---
-    
-    #### Method 2: Manual Entry Tool
-    
-    **For when you want perfect data quality:**
-    
-    1. **Download** `linkedin_data_entry.html`
-    2. **Open it** in your browser
-    3. **Browse LinkedIn** and find relevant posts
-    4. **Copy/paste** the information from each post into the form:
-       - Author name
-       - Author title
-       - Post text
-       - Engagement numbers (likes, comments, shares)
-       - Post URL
-    5. **Click "Add Post"** for each entry
-    6. When done, **click "Download CSV"**
-    7. **Upload the CSV here!**
-    
-    **Pros:** Perfect accuracy, works even if LinkedIn changes their layout
-    
-    ---
-    
-    #### Method 3: Bookmarklet (Advanced Users)
-    
-    **One-click extraction:**
-    
-    1. **Read** the `BOOKMARKLET_FIX.md` guide
-    2. **Create a bookmark** with the extraction code
-    3. **Search LinkedIn** for your topic
-    4. **Scroll** to load posts
-    5. **Click the bookmark** - CSV downloads automatically!
-    
-    **Pros:** Fastest method once set up
-    
-    ---
-    
-    ### 🎯 Tips for Best Results
-    
-    - **Load more posts**: The more you scroll on LinkedIn before copying/extracting, the more data you get
-    - **Monitor regularly**: Do this weekly to track trends over time
-    - **Save your CSVs**: Keep historical data to see how conversations evolve
-    - **Try different searches**: Monitor multiple topics or hashtags
-    - **Combine data**: Merge multiple CSV files in Excel to analyze larger datasets
-    
-    ---
-    
-    ### 📥 Expected CSV Format
-    
-    Your CSV file should have these columns:
-    
-    | Column | Description | Example |
-    |--------|-------------|---------|
-    | post_id | Unique identifier | "post_001" |
-    | author | Author name | "Sarah Johnson" |
-    | title | Professional title | "CEO at TechCorp" |
-    | text | Post content | "Just launched our new..." |
-    | likes | Number of likes | 245 |
-    | comments | Number of comments | 32 |
-    | shares | Number of shares | 18 |
-    | date | Post date | "2024-02-04" |
-    | url | LinkedIn URL | "https://linkedin.com/..." |
-    
-    Don't worry if you're missing some columns - the app will handle it!
-    
-    ---
-    
-    ### 🚀 Quick Start (Right Now!)
-    
-    **Try this in 5 minutes:**
-    
-    1. Download `linkedin_copy_paste_extractor.html`
-    2. Open it in your browser
-    3. Search LinkedIn for any topic you're interested in
-    4. Copy the page (Ctrl+A, Ctrl+C)
-    5. Paste into the tool (Ctrl+V)
-    6. Click "Extract & Download"
-    7. Upload the CSV here
-    8. Analyze! 🎉
-    
-    ---
-    
-    ### ⚖️ Legal & Ethical Notes
-    
-    **Always comply with:**
-    - ✅ LinkedIn Terms of Service
-    - ✅ Data privacy regulations (GDPR, CCPA)
-    - ✅ Only collect publicly visible posts
-    - ✅ Use data for legitimate purposes
-    - ✅ Respect user privacy
-    
-    **Don't:**
-    - ❌ Collect private or restricted content
-    - ❌ Use data for harassment or spam
-    - ❌ Share personal information
-    - ❌ Automate at scale without permission
-    
-    ---
     
     ### 📊 What You Can Analyze
     
-    Once you have your data, this app shows you:
+    Once you upload your data, this app shows you:
     
     - 📈 **Engagement trends** - What content performs best
-    - 🎯 **Topic clusters** - Main themes in the conversation
+    - 🎯 **Topic clusters** - Main themes in the conversation  
     - 💭 **Sentiment analysis** - How people feel about the topic
     - 🏆 **Top posts** - Most engaging content
     - 📊 **Reach estimates** - How far content is spreading
@@ -753,16 +781,16 @@ def main():
     
     ---
     
-    ### 🆘 Need Help?
+    ### ⚖️ Legal & Ethical Notes
     
-    - **CSV won't upload?** Check the format matches the expected columns
-    - **No posts extracted?** Make sure you scroll on LinkedIn to load posts first
-    - **Tool not working?** Try the Manual Entry Tool as backup
-    - **Other issues?** Check the troubleshooting guides in the documentation
+    **Always comply with:**
+    - ✅ LinkedIn Terms of Service
+    - ✅ Data privacy regulations
+    - ✅ Only collect publicly visible posts
+    - ✅ Use data for legitimate purposes
     
     ---
     
-    **Made with ❤️ using Streamlit • 100% Free & Open Source**
     """)
 
 if __name__ == "__main__":
