@@ -177,19 +177,33 @@ def analyze_sentiment(text):
         'love', 'impressed', 'incredible', 'outstanding', 'brilliant', 'perfect',
         'highly recommend', 'revolutionary', 'innovative', 'excited', 'thrilled',
         'success', 'beneficial', 'advantage', 'efficient', 'effective', 'valuable',
-        'proud', 'achieved', 'transforming', 'game-changer', 'streamlined', 'impressed'
+        'proud', 'achieved', 'transforming', 'game-changer', 'streamlined', 'impressed',
+        # Professional/business positive terms
+        'expertise', 'leading', 'credible', 'strengthens', 'resonate', 'clear',
+        'strong', 'quality', 'trusted', 'professional', 'results', 'delivers',
+        'opportunity', 'growth', 'improved', 'optimized', 'recommended', 'proven'
     ]
     
-    # Negative keywords
+    # Negative keywords (removed ambiguous words like 'complex' and 'challenging')
     negative_words = [
         'bad', 'terrible', 'awful', 'horrible', 'poor', 'disappointing', 'worst',
-        'hate', 'failed', 'problem', 'issue', 'concern', 'difficult', 'complex',
-        'challenging', 'struggle', 'frustrating', 'disappointed', 'unfortunately',
-        'lacking', 'confused', 'unclear', 'expensive', 'costly', 'waste'
+        'hate', 'failed', 'problem', 'issue', 'concern', 'difficult',
+        'struggle', 'frustrating', 'disappointed', 'unfortunately',
+        'lacking', 'confused', 'unclear', 'expensive', 'costly', 'waste',
+        'broken', 'error', 'bug', 'reject'
     ]
     
+    # Check for positive context around potentially negative words
+    # Words like "complex" can be positive in context like "handles complex problems"
+    context_positive = [
+        'translate complex', 'handle complex', 'manage complex', 'navigate complex',
+        'solve complex', 'simplify complex', 'despite challenge', 'overcome challenge'
+    ]
+    
+    context_boost = sum(1 for phrase in context_positive if phrase in text_lower)
+    
     # Count sentiment words
-    positive_count = sum(1 for word in positive_words if word in text_lower)
+    positive_count = sum(1 for word in positive_words if word in text_lower) + context_boost
     negative_count = sum(1 for word in negative_words if word in text_lower)
     
     # Calculate polarity score (-1 to 1)
