@@ -4,8 +4,6 @@ import numpy as np
 from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
 import re
 from collections import Counter
 import json
@@ -212,25 +210,68 @@ def analyze_sentiment(text):
         return 'Neutral', polarity
 
 # Topic clustering
-def cluster_topics(texts, n_clusters=3):
-    """Cluster posts into topics using TF-IDF and K-Means"""
-    vectorizer = TfidfVectorizer(max_features=100, stop_words='english')
-    X = vectorizer.fit_transform(texts)
+# Simple topic clustering based on keywords (no ML required)
+def cluster_topics_simple(texts, n_clusters=3):
+    """
+    Simple keyword-based topic clustering without sklearn
+    Groups posts based on common keywords
+    """
+    # Define topic keywords (you can customize these)
+    topic_keywords = {
+        0: ['innovation', 'technology', 'digital', 'ai', 'tech', 'data', 'software', 'platform'],
+        1: ['team', 'leadership', 'culture', 'people', 'success', 'growth', 'achieved', 'proud'],
+        2: ['business', 'market', 'strategy', 'industry', 'solutions', 'customers', 'value', 'roi']
+    }
     
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    clusters = kmeans.fit_predict(X)
+    # If we have more than 3 clusters requested, add generic ones
+    if n_clusters > 3:
+        topic_keywords[3] = ['process', 'implementation', 'framework', 'methodology', 'approach']
+    if n_clusters > 4:
+        topic_keywords[4] = ['sustainability', 'impact', 'future', 'transformation', 'change']
     
-    # Get top words for each cluster
-    feature_names = vectorizer.get_feature_names_out()
-    cluster_keywords = {}
+    clusters = []
+    cluster_keywords_result = {}
     
+    # Assign each text to a cluster based on keyword matches
+    for text in texts:
+        text_lower = text.lower()
+        best_cluster = 0
+        max_matches = 0
+        
+        # Count keyword matches for each cluster
+        for cluster_id, keywords in list(topic_keywords.items())[:n_clusters]:
+            matches = sum(1 for keyword in keywords if keyword in text_lower)
+            if matches > max_matches:
+                max_matches = matches
+                best_cluster = cluster_id
+        
+        clusters.append(best_cluster)
+    
+    # Extract actual common words from each cluster
     for i in range(n_clusters):
-        cluster_center = kmeans.cluster_centers_[i]
-        top_indices = cluster_center.argsort()[-5:][::-1]
-        top_words = [feature_names[idx] for idx in top_indices]
-        cluster_keywords[i] = top_words
+        cluster_texts = [texts[j] for j in range(len(texts)) if clusters[j] == i]
+        if cluster_texts:
+            # Get most common words from this cluster
+            all_words = []
+            for text in cluster_texts:
+                words = re.findall(r'\b[a-z]{4,}\b', text.lower())
+                all_words.extend(words)
+            
+            # Remove common stopwords
+            stopwords = {'that', 'this', 'with', 'from', 'have', 'been', 'will', 'their', 'about', 'would', 'there'}
+            all_words = [w for w in all_words if w not in stopwords]
+            
+            # Get top 5 most common
+            if all_words:
+                word_counts = Counter(all_words)
+                top_words = [word for word, count in word_counts.most_common(5)]
+                cluster_keywords_result[i] = top_words
+            else:
+                cluster_keywords_result[i] = topic_keywords.get(i, ['topic'])[:5]
+        else:
+            cluster_keywords_result[i] = topic_keywords.get(i, ['topic'])[:5]
     
-    return clusters, cluster_keywords
+    return clusters, cluster_keywords_result
 
 # Main app logic
 def main():
@@ -320,7 +361,7 @@ def main():
         st.sidebar.warning(f"⚠️ Adjusted clusters to {n_clusters} (not enough posts)")
     
     try:
-        clusters, cluster_keywords = cluster_topics(df['text'].tolist(), n_clusters)
+        clusters, cluster_keywords = cluster_topics_simple(df['text'].tolist(), n_clusters)
         df['cluster'] = clusters
         
         # Assign cluster names based on keywords
