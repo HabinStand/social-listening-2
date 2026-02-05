@@ -33,14 +33,26 @@ topic = st.sidebar.text_input(
 st.sidebar.markdown("""
 **💡 How to collect LinkedIn data:**
 
-1. **Search LinkedIn** for your topic
-2. **Copy the entire page** (Ctrl+A, Ctrl+C)
-3. **Use the Copy-Paste Extractor tool** to convert to CSV
-4. **Upload the CSV here**
+Since this app can't access LinkedIn directly, you'll need to collect data manually:
 
-Or manually enter posts using the **Manual Entry Tool**.
+**Method 1: Copy-Paste (Recommended)**
+1. Use the **Copy-Paste Extractor** HTML tool
+2. Search LinkedIn for your topic
+3. Copy entire page (Ctrl+A, Ctrl+C)
+4. Paste into tool → Download CSV
+5. Upload CSV here
 
-[Download the extraction tools](#) from the project files.
+**Method 2: Manual Entry**
+1. Use the **Manual Entry** HTML tool
+2. Copy post details from LinkedIn
+3. Add each post → Download CSV
+4. Upload CSV here
+
+**Get the tools:** Download `linkedin_copy_paste_extractor.html` and `linkedin_data_entry.html` from the project repository.
+
+---
+
+**For now, try the Demo Data below!** ⬇️
 """)
 
 # Sample data generator for demonstration
@@ -574,6 +586,32 @@ def main():
     
     # Footer
     st.markdown("---")
+    
+    # Prominent download section
+    st.info("👇 **Need the data collection tools?** Download the HTML files from the '2_LOCAL_TOOLS' folder in the project repository.")
+    
+    with st.expander("📥 Where to Get the Data Collection Tools", expanded=False):
+        st.markdown("""
+        The data collection tools are **HTML files** that you need to download and save on your computer.
+        
+        **Files you need:**
+        - `linkedin_copy_paste_extractor.html` ⭐ (Recommended)
+        - `linkedin_data_entry.html` (Alternative method)
+        
+        **Where to find them:**
+        1. Go to the project's GitHub repository or download package
+        2. Look in the `2_LOCAL_TOOLS` folder
+        3. Download both HTML files to your computer
+        4. Save them somewhere easy to find (like your Desktop)
+        
+        **How to use:**
+        - Double-click the HTML file to open it in your browser
+        - No installation needed - they work offline!
+        - Follow the instructions in each tool
+        
+        **Don't have the files?** Ask whoever deployed this app to share the `2_LOCAL_TOOLS` folder with you.
+        """)
+    
     st.markdown("""
     ### 📝 How to Collect LinkedIn Data
     
