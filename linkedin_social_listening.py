@@ -551,6 +551,203 @@ def main():
             negative_pct = (sentiment_breakdown.get('Negative', 0) / len(cluster_df)) * 100
             st.metric("Negative", f"{negative_pct:.1f}%")
     
+    # Reach by Sentiment Analysis
+    st.header("📊 Reach Analysis by Sentiment")
+    
+    st.markdown("""
+    This section shows how different sentiment categories perform in terms of reach and engagement.
+    """)
+    
+    # Calculate reach metrics by sentiment
+    sentiment_reach = df.groupby('sentiment').agg({
+        'reach_estimate': ['sum', 'mean', 'count'],
+        'engagement_score': ['sum', 'mean'],
+        'likes': 'sum',
+        'comments': 'sum',
+        'shares': 'sum'
+    }).round(0)
+    
+    # Flatten column names
+    sentiment_reach.columns = ['_'.join(col).strip() for col in sentiment_reach.columns.values]
+    sentiment_reach = sentiment_reach.reset_index()
+    
+    # Overview metrics
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric(
+            "🟢 Positive Posts",
+            f"{int(sentiment_reach[sentiment_reach['sentiment'] == 'Positive']['reach_estimate_count'].values[0]) if 'Positive' in sentiment_reach['sentiment'].values else 0} posts",
+            f"{int(sentiment_reach[sentiment_reach['sentiment'] == 'Positive']['reach_estimate_sum'].values[0]):,} total reach" if 'Positive' in sentiment_reach['sentiment'].values else "0 reach"
+        )
+    
+    with col2:
+        st.metric(
+            "🟡 Neutral Posts",
+            f"{int(sentiment_reach[sentiment_reach['sentiment'] == 'Neutral']['reach_estimate_count'].values[0]) if 'Neutral' in sentiment_reach['sentiment'].values else 0} posts",
+            f"{int(sentiment_reach[sentiment_reach['sentiment'] == 'Neutral']['reach_estimate_sum'].values[0]):,} total reach" if 'Neutral' in sentiment_reach['sentiment'].values else "0 reach"
+        )
+    
+    with col3:
+        st.metric(
+            "🔴 Negative Posts",
+            f"{int(sentiment_reach[sentiment_reach['sentiment'] == 'Negative']['reach_estimate_count'].values[0]) if 'Negative' in sentiment_reach['sentiment'].values else 0} posts",
+            f"{int(sentiment_reach[sentiment_reach['sentiment'] == 'Negative']['reach_estimate_sum'].values[0]):,} total reach" if 'Negative' in sentiment_reach['sentiment'].values else "0 reach"
+        )
+    
+    # Detailed comparison
+    st.subheader("📈 Sentiment Performance Comparison")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Total reach by sentiment
+        sentiment_summary = df.groupby('sentiment').agg({
+            'reach_estimate': 'sum',
+            'engagement_score': 'sum'
+        }).reset_index()
+        
+        fig_reach_sentiment = px.bar(
+            sentiment_summary,
+            x='sentiment',
+            y='reach_estimate',
+            color='sentiment',
+            title="Total Reach by Sentiment",
+            labels={'reach_estimate': 'Total Estimated Reach', 'sentiment': 'Sentiment'},
+            color_discrete_map={'Positive': '#2ecc71', 'Neutral': '#95a5a6', 'Negative': '#e74c3c'}
+        )
+        st.plotly_chart(fig_reach_sentiment, use_container_width=True)
+    
+    with col2:
+        # Average reach by sentiment
+        sentiment_avg = df.groupby('sentiment').agg({
+            'reach_estimate': 'mean',
+            'engagement_score': 'mean'
+        }).reset_index()
+        
+        fig_avg_reach = px.bar(
+            sentiment_avg,
+            x='sentiment',
+            y='reach_estimate',
+            color='sentiment',
+            title="Average Reach per Post by Sentiment",
+            labels={'reach_estimate': 'Avg Reach per Post', 'sentiment': 'Sentiment'},
+            color_discrete_map={'Positive': '#2ecc71', 'Neutral': '#95a5a6', 'Negative': '#e74c3c'}
+        )
+        st.plotly_chart(fig_avg_reach, use_container_width=True)
+    
+    # Engagement breakdown by sentiment
+    st.subheader("💬 Engagement Breakdown by Sentiment")
+    
+    engagement_by_sentiment = df.groupby('sentiment').agg({
+        'likes': 'sum',
+        'comments': 'sum',
+        'shares': 'sum'
+    }).reset_index()
+    
+    # Melt for grouped bar chart
+    engagement_melted = engagement_by_sentiment.melt(
+        id_vars='sentiment',
+        value_vars=['likes', 'comments', 'shares'],
+        var_name='engagement_type',
+        value_name='count'
+    )
+    
+    fig_engagement_breakdown = px.bar(
+        engagement_melted,
+        x='sentiment',
+        y='count',
+        color='engagement_type',
+        barmode='group',
+        title="Engagement Types by Sentiment",
+        labels={'count': 'Total Count', 'sentiment': 'Sentiment', 'engagement_type': 'Type'},
+        color_discrete_map={'likes': '#3b5998', 'comments': '#00acee', 'shares': '#0077b5'}
+    )
+    st.plotly_chart(fig_engagement_breakdown, use_container_width=True)
+    
+    # Detailed table
+    st.subheader("📋 Sentiment Performance Table")
+    
+    # Create comprehensive summary table
+    sentiment_table = df.groupby('sentiment').agg({
+        'post_id': 'count',
+        'reach_estimate': ['sum', 'mean', 'max'],
+        'engagement_score': ['sum', 'mean', 'max'],
+        'likes': ['sum', 'mean'],
+        'comments': ['sum', 'mean'],
+        'shares': ['sum', 'mean']
+    }).round(0)
+    
+    # Flatten and rename columns
+    sentiment_table.columns = ['_'.join(col).strip() for col in sentiment_table.columns.values]
+    sentiment_table = sentiment_table.reset_index()
+    
+    # Rename for display
+    display_names = {
+        'sentiment': 'Sentiment',
+        'post_id_count': 'Total Posts',
+        'reach_estimate_sum': 'Total Reach',
+        'reach_estimate_mean': 'Avg Reach',
+        'reach_estimate_max': 'Max Reach',
+        'engagement_score_sum': 'Total Engagement',
+        'engagement_score_mean': 'Avg Engagement',
+        'engagement_score_max': 'Max Engagement',
+        'likes_sum': 'Total Likes',
+        'likes_mean': 'Avg Likes',
+        'comments_sum': 'Total Comments',
+        'comments_mean': 'Avg Comments',
+        'shares_sum': 'Total Shares',
+        'shares_mean': 'Avg Shares'
+    }
+    
+    sentiment_table = sentiment_table.rename(columns=display_names)
+    
+    # Format numbers
+    for col in sentiment_table.columns:
+        if col != 'Sentiment':
+            sentiment_table[col] = sentiment_table[col].apply(lambda x: f"{int(x):,}")
+    
+    st.dataframe(sentiment_table, use_container_width=True, hide_index=True)
+    
+    # Key insights
+    st.subheader("💡 Key Insights")
+    
+    # Calculate which sentiment has highest reach
+    best_sentiment = sentiment_summary.loc[sentiment_summary['reach_estimate'].idxmax(), 'sentiment']
+    best_reach = sentiment_summary.loc[sentiment_summary['reach_estimate'].idxmax(), 'reach_estimate']
+    
+    # Calculate which has best average
+    best_avg_sentiment = sentiment_avg.loc[sentiment_avg['reach_estimate'].idxmax(), 'sentiment']
+    best_avg_reach = sentiment_avg.loc[sentiment_avg['reach_estimate'].idxmax(), 'reach_estimate']
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.info(f"""
+        **Highest Total Reach**
+        
+        {best_sentiment} posts generated the most total reach with {best_reach:,.0f} estimated impressions.
+        """)
+    
+    with col2:
+        st.info(f"""
+        **Best Average Performance**
+        
+        {best_avg_sentiment} posts have the highest average reach at {best_avg_reach:,.0f} per post.
+        """)
+    
+    with col3:
+        # Calculate engagement rate by sentiment
+        sentiment_summary['engagement_rate'] = (sentiment_summary['engagement_score'] / sentiment_summary['reach_estimate'] * 100)
+        best_engagement_sentiment = sentiment_summary.loc[sentiment_summary['engagement_rate'].idxmax(), 'sentiment']
+        best_engagement_rate = sentiment_summary.loc[sentiment_summary['engagement_rate'].idxmax(), 'engagement_rate']
+        
+        st.info(f"""
+        **Best Engagement Rate**
+        
+        {best_engagement_sentiment} posts have the best engagement rate at {best_engagement_rate:.1f}%.
+        """)
+    
     # Export data
     st.header("💾 Export Data")
     
